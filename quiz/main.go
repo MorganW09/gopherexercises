@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"time"
 )
 
 type QuestionAndAnswer struct {
@@ -16,23 +17,36 @@ type QuestionAndAnswer struct {
 	Answer   int
 }
 
-func RunGame(questionAndAnswers []QuestionAndAnswer) {
+func RunGame(questionAndAnswers []QuestionAndAnswer, timeLimit int) {
+	fmt.Println(timeLimit)
+	timer := time.NewTimer(time.Duration(timeLimit) * time.Second)
 	correct := 0
+problemloop:
 	for _, qa := range questionAndAnswers {
 		fmt.Printf("%s: ", qa.Question)
-		var input string
-		fmt.Scanln(&input)
+		answerCh := make(chan string)
 
-		guess, err := strconv.Atoi(input)
-		if err != nil {
-			// handle error
-			fmt.Println(err)
-		} else {
-			if guess == qa.Answer {
-				correct++
+		go func() {
+			var input string
+			fmt.Scanln(&input)
+			answerCh <- input
+		}()
+
+		select {
+		case <-timer.C:
+			fmt.Println()
+			break problemloop
+		case answer := <-answerCh:
+			guess, err := strconv.Atoi(answer)
+			if err != nil {
+				// handle error
+				fmt.Println(err)
+			} else {
+				if guess == qa.Answer {
+					correct++
+				}
+				fmt.Println(guess)
 			}
-			fmt.Println(guess)
-
 		}
 	}
 
@@ -61,6 +75,11 @@ func ReadInCsv(csvName string) []QuestionAndAnswer {
 
 func main() {
 	csvFilename := flag.String("csv", "problems.csv", "a csv file in the format of 'question,answer'")
+	timeLimit := flag.Int("limit", 30, "the time limit for the quiz in seconds")
+	flag.Parse()
+
+	fmt.Println(*csvFilename)
+	fmt.Println(*timeLimit)
 	questionAndAnswers := ReadInCsv(*csvFilename)
-	RunGame(questionAndAnswers)
+	RunGame(questionAndAnswers, *timeLimit)
 }
